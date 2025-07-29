@@ -6,17 +6,23 @@ import Ground from './Ground';
 import { Character } from './Character';
 import Town from './Town';
 import Sun from './Sun';
+import Indoor from './Indoor';
 // Main scene component
-export function Scene({ setDialogue }) {
+export function Scene({ setDialogue, buildingRefs, scene, setScene }) {
   return (
     <Canvas
       camera={{ position: [0, 2.5, 5], fov: 75 }}
-      shadows // Enable shadows in the renderer
+      shadows
     >
-      <ambientLight intensity={0.3} /> {/* Reduced to emphasize sun */}
-      <Sun />
-      <Character setDialogue={setDialogue} />
-      <Town />
+      {scene === 'outdoor' ? (
+        <>
+          <Sun />
+          <Town buildingRefs={buildingRefs} />
+        </>
+      ) : (
+        <Indoor buildingRefs={buildingRefs} />
+      )}
+      <Character setDialogue={setDialogue} buildingRefs={buildingRefs} scene={scene} setScene={setScene} />
     </Canvas>
   );
 }

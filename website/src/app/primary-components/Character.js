@@ -7,21 +7,21 @@ import { Dialogue } from './Dialogue';
 
 
 // Character component with animated model
-export function Character({ setDialogue }) {
+export function Character({ setDialogue, buildingRefs, scene, setScene }) {
   const ref = useRef();
-  let scene = null;
+  let scene2 = null;
   let animations = [];
   const [cameraDistance, setCameraDistance] = useState(7); // Initial distance from character
   const [cameraTheta, setCameraTheta] = useState(0.5); // Horizontal angle for orbiting
   const [isDragging, setIsDragging] = useState(false); // Track mouse drag state
   try {
     const gltf = useGLTF('/models_3d/cat.glb');
-    scene = gltf.scene;
+    scene2 = gltf.scene;
     animations = gltf.animations;
-    console.log('Model loaded successfully. Available animations:', gltf.animations.map(a => a.name));
+   // console.log('Model loaded successfully. Available animations:', gltf.animations.map(a => a.name));
   } catch (error) {
     console.error('Failed to load model at /models_3d/cat.glb:', error.message, error.stack);
-    scene = new THREE.Mesh(
+    scene2 = new THREE.Mesh(
       new THREE.BoxGeometry(1, 1, 1),
       new THREE.MeshStandardMaterial({ color: 'red' })
     );
@@ -30,6 +30,7 @@ export function Character({ setDialogue }) {
   const { actions, mixer } = useAnimations(animations, ref);
   const [sub, get] = useKeyboardControls();
   const { camera } = useThree();
+
   useEffect(() => {
     const handleMouseDown = () => setIsDragging(true);
     const handleMouseUp = () => setIsDragging(false);
@@ -58,31 +59,57 @@ export function Character({ setDialogue }) {
   }, [isDragging]);
 
   useEffect(() => {
-    console.log('Animation actions available:', Object.keys(actions));
+    //console.log('Animation actions available:', Object.keys(actions));
   }, [actions]);
 
   useFrame(() => {
-    if (!ref.current) return; // Prevent updates if ref is invalid
-
+    if (!ref.current) return;
+      const buildings = [
+          { position: [0, 0, 5], content: 'Bookstore: Welcome to my creative hub!', action: () => setScene('indoor') },
+          { position: [-5, 0, 0], content: 'Projects: Built a 3D portfolio using Next.js and Three.js.' },
+          { position: [0, 0, -10], content: 'Skills: JavaScript, React, Three.js, Next.js, Tailwind CSS.' },
+        ];
     const { forward, backward, left, right, interact, zoomIn, zoomOut, orbitLeft, orbitRight } = get();
+  
     const speed = 0.1;
     let isMoving = false;
-    let targetRotation = cameraTheta + Math.PI; // Face away from camera by default
-    if (forward || backward || left || right) {
+    let inProximity = false;
+    let targetRotation = cameraTheta + Math.PI;
+
+    // Calculate potential new position
+    let moveX = 0;
+    let moveZ = 0;
+    if (forward) moveZ -= speed;
+    if (backward) moveZ += speed;
+    if (left) moveX -= speed;
+    if (right) moveX += speed;
+
+    if (moveX !== 0 || moveZ !== 0) {
       isMoving = true;
-      // Calculate movement direction relative to camera
-      let moveX = 0;
-      let moveZ = 0;
-      if (forward) moveZ -= speed;
-      if (backward) moveZ += speed;
-      if (left) moveX -= speed;
-      if (right) moveX += speed;
+      const newX = ref.current.position.x + moveX * Math.cos(cameraTheta) + moveZ * Math.sin(cameraTheta);
+      const newZ = ref.current.position.z + moveZ * Math.cos(cameraTheta) - moveX * Math.sin(cameraTheta);
 
-      // Update position
-      ref.current.position.x += moveX * Math.cos(cameraTheta) + moveZ * Math.sin(cameraTheta);
-      ref.current.position.z += moveZ * Math.cos(cameraTheta) - moveX * Math.sin(cameraTheta);
+      // Create character bounding box (adjusted for scale=[0.1, 0.1, 0.1])
+      const characterBox = new THREE.Box3().setFromCenterAndSize(
+        new THREE.Vector3(newX, ref.current.position.y, newZ),
+        new THREE.Vector3(0.5 * 0.1, 0.5 * 0.1, 0.5 * 0.1) // Small box for cat
+      );
 
-      // Set rotation based on movement direction
+      // Check collisions with building bounding boxes
+        let canMove = true;
+    // Check proximity to buildings for interaction
+
+
+      // Update position only if no collision
+      if (canMove) {
+        ref.current.position.x = newX;
+        ref.current.position.z = newZ;
+      }
+
+      // Clamp to plane bounds (80x500)
+      ref.current.position.x = THREE.MathUtils.clamp(ref.current.position.x, -40, 40);
+      ref.current.position.z = THREE.MathUtils.clamp(ref.current.position.z, -250, 250);
+
       if (moveX !== 0 || moveZ !== 0) {
         targetRotation = Math.atan2(moveX, moveZ) + cameraTheta;
       }
@@ -129,23 +156,54 @@ export function Character({ setDialogue }) {
     camera.lookAt(ref.current.position);
 
     // Check proximity to buildings for interaction
-    const buildings = [
-      { position: [5, 0, 0], content: 'About Me: I am a passionate developer with a love for 3D web experiences.' },
-      { position: [-5, 0, 0], content: 'Projects: Built a 3D portfolio website using Next.js and Three.js.' },
-      { position: [0, 0, -10], content: 'Skills: JavaScript, React, Three.js, Next.js, Tailwind CSS.' },
-    ];
-    if (interact) {
-      buildings.forEach((building) => {
+
+    //SHOW dialogue that they can interact..
+        buildings.forEach((building) => {
         const distance = ref.current.position.distanceTo(new THREE.Vector3(...building.position));
         if (distance < 3) {
-          setDialogue({ open: true, content: building.content });
+          inProximity = true;
+          setDialogue({ open: true, content: building.content, type: 'proximity' });
         }
       });
+      if (interact) {
+        
+      if (scene === 'outdoor') {
+
+        buildings.forEach((building) => {
+          const distance = ref.current.position.distanceTo(new THREE.Vector3(...building.position));
+          if (distance < 3) {
+            console.log('distance less than 3');
+            //setDialogue({ open: true, content: building.content });
+            if (building.action) {
+
+              console.log(building);
+              building.action();
+              ref.current.position.set(0, 0, 0); // Reset position for indoor
+            }
+          }
+        });
+      } else {
+        const indoorObjects = [
+          { position: [0, 0, 5], content: 'Door: Return to the town.', action: () => setScene('outdoor') },
+          { position: [3, 0, 0], content: 'Bookshelf: Explore my projects!' },
+          { position: [-3, 0, 0], content: 'Bookshelf: Check out my skills!' },
+        ];
+        indoorObjects.forEach((obj) => {
+          const distance = ref.current.position.distanceTo(new THREE.Vector3(...obj.position));
+          if (distance < 2) {
+            setDialogue({ open: true, content: obj.content });
+            if (obj.action) {
+              obj.action();
+              ref.current.position.set(0, 0, 0); // Reset position for outdoor
+            }
+          }
+        });
+      }
     }
   });
 
   // Only render primitive if scene is valid
-  if (!scene) {
+  if (!scene2) {
     console.error('Scene is invalid, not rendering primitive');
     return null;
   }
@@ -153,7 +211,7 @@ export function Character({ setDialogue }) {
   return (
     <primitive
       ref={ref}
-      object={scene}
+      object={scene2}
       position={[0, 0.5, 0]}
       scale={[0.008, 0.008, 0.008]}
       rotation={[0, Math.PI, 0]}

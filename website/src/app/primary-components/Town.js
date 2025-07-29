@@ -5,12 +5,14 @@ import { KeyboardControls, useKeyboardControls, useGLTF, useAnimations, useTextu
 import * as THREE from 'three';
 // Town component with ground and buildings
 
-export default function Town() {
+export default function Town({ buildingRefs }) {
+  const bookstoreRef = useRef();
+  buildingRefs[0] = bookstoreRef;
   let bookstore = null;
     try {
       const bookstoreGLTF = useGLTF('/models_3d/bookstore.glb');
       bookstore = bookstoreGLTF.scene;
-      console.log('Bookstore loaded successfully.');
+     // console.log('Bookstore loaded successfully.');
     } catch (error) {
       console.error('Failed to load bookstore at /models_3d/bookstore.glb:', error.message, error.stack);
       bookstore = new THREE.Mesh(
@@ -30,7 +32,10 @@ export default function Town() {
     texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
     texture.repeat.set(8, 50); // Tile 10x10 for 100x100 plane
   });
-
+const yellowCubeRef = useRef();
+  const purpleCubeRef = useRef();
+  buildingRefs[1] = yellowCubeRef;
+  buildingRefs[2] = purpleCubeRef;
   return (
     <>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.5, 0]} receiveShadow>
@@ -41,16 +46,17 @@ export default function Town() {
         />
       </mesh>
        <primitive
+       ref={bookstoreRef}
       object={bookstore}
       position={[-25, -0.5, 0]}
       scale={[70, 70, 70]}
       rotation={[0, Math.PI/2, 0]}
       castShadow />
-      <mesh position={[-5, 1, 0]} castShadow receiveShadow>
+       <mesh ref={yellowCubeRef} position={[-5, 0, 10]} castShadow receiveShadow>
         <boxGeometry args={[2, 2, 2]} />
         <meshStandardMaterial color="yellow" />
       </mesh>
-      <mesh position={[0, 1, -10]} castShadow receiveShadow>
+      <mesh ref={purpleCubeRef} position={[0, 0, -10]} castShadow receiveShadow>
         <boxGeometry args={[2, 2, 2]} />
         <meshStandardMaterial color="purple" />
       </mesh>
